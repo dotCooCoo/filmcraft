@@ -123,9 +123,9 @@ pub fn intercept_quit(app: &mut FilmcraftApp) -> bool {
     true
 }
 
-/// File ▸ Open Project once the project at `path` is chosen: with unsaved changes Save / Don't
-/// Save / Cancel is asked first, as Close Project asks, and `path` opens after Save or Don't Save.
-/// Returns whether it asked.
+/// File ▸ Open Project once the project at `path` is chosen, File ▸ Open Recent and Home's Recent
+/// list: with unsaved changes Save / Don't Save / Cancel is asked first, as Close Project asks, and
+/// `path` opens after Save or Don't Save. Returns whether it asked.
 pub fn intercept_open(app: &mut FilmcraftApp, path: &str) -> bool {
     if !app.session.is_dirty() {
         return false;

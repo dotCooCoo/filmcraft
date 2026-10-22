@@ -1,5 +1,6 @@
-//! Headless UI tests of File ▸ Open Project with unsaved changes: once the project to open is
-//! chosen, the Save Project prompt asks Cancel / Don't Save / Save before it opens.
+//! Headless UI tests of File ▸ Open Project, File ▸ Open Recent and Home's Recent list with unsaved
+//! changes: once the project to open is chosen, the Save Project prompt asks Cancel / Don't Save /
+//! Save before it opens.
 
 use std::path::PathBuf;
 use std::sync::mpsc::{Sender, channel};
@@ -10,6 +11,7 @@ use filmcraft_engine::Session;
 use filmcraft_engine::project::{ClipId, Label};
 use filmcraft_ui_egui::FilmcraftApp;
 use filmcraft_ui_egui::control::ControlRequest;
+use filmcraft_ui_egui::state::Mode;
 use serde_json::{Value, json};
 
 struct Driver {
@@ -107,6 +109,11 @@ impl Driver {
         self.app().hooks.pick_open_project = Some(Box::new(move || Some(path.clone())));
         self.menu("file.open")
     }
+
+    /// Where `path` is in the recent projects (File ▸ Open Recent, Home's Recent list).
+    fn recent(&mut self, path: &str) -> usize {
+        self.app().session.prefs.general.recent_projects.iter().position(|p| p == path).unwrap()
+    }
 }
 
 /// A folder for one test holding the demo project saved as `current.fcproj` and `other.fcproj`.
@@ -199,6 +206,52 @@ fn open_project_asks_only_with_unsaved_changes_and_a_scripted_open_does_not_ask(
     d.exec("file.open", json!({"path": current}));
     assert!(d.app().ui.clip_dialog.is_none());
     assert_eq!(d.path(), Some(current));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn open_recent_with_unsaved_changes_asks_first() {
+    let mut d = Driver::new();
+    let (dir, current, other) = projects(&mut d, "openRecent");
+    let clip = d.edit();
+    let i = d.recent(&other);
+    let r = d.menu(&format!("file.openRecent.{i}"));
+    assert_eq!(r["dialog"], "openProject");
+    assert_eq!(d.path(), Some(current.clone()), "nothing opens before an answer");
+    d.click("openProject.cancel");
+    assert_eq!(d.path(), Some(current.clone()));
+    assert_eq!(d.label(clip), Label::Yellow, "the change is kept");
+    let i = d.recent(&other);
+    d.menu(&format!("file.openRecent.{i}"));
+    d.click("openProject.save");
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert_eq!(d.path(), Some(other));
+    assert!(!d.app().session.is_dirty());
+    // the change was written to the project it was made in
+    d.exec("file.open", json!({"path": current}));
+    assert_eq!(d.label(clip), Label::Yellow);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn home_recent_with_unsaved_changes_asks_first() {
+    let mut d = Driver::new();
+    let (dir, current, other) = projects(&mut d, "homeRecent");
+    let first = d.app().session.active_sequence().unwrap().video_tracks[0].items[0].clone();
+    let clip = d.edit();
+    d.click("header.home");
+    let i = d.recent(&other);
+    d.click(&format!("import.recent.{i}"));
+    assert_eq!(d.path(), Some(current.clone()), "nothing opens before an answer");
+    assert!(d.has("openProject.dontSave"));
+    d.click("openProject.dontSave");
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert_eq!(d.path(), Some(other));
+    assert_eq!(d.app().ui.mode, Mode::Edit);
+    assert!(!d.app().session.is_dirty());
+    // the project the change was made in is as it was saved
+    d.exec("file.open", json!({"path": current}));
+    assert_eq!(d.label(clip), first.label);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

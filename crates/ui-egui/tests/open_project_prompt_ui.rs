@@ -11,6 +11,7 @@ use filmcraft_engine::Session;
 use filmcraft_engine::project::{ClipId, Label};
 use filmcraft_ui_egui::FilmcraftApp;
 use filmcraft_ui_egui::control::ControlRequest;
+use filmcraft_ui_egui::native_dialogs::FileDialog;
 use filmcraft_ui_egui::state::Mode;
 use serde_json::{Value, json};
 
@@ -299,5 +300,81 @@ fn open_project_asks_when_the_open_dialog_answers_in_a_later_frame() {
     assert_eq!(d.path(), Some(current));
     d.click("openProject.dontSave");
     assert_eq!(d.path(), Some(other));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn open_project_save_waits_for_a_save_dialog_answered_later() {
+    let mut d = Driver::new();
+    let (dir, _, other) = projects(&mut d, "saveLater");
+    d.app().session.path = None;
+    let clip = d.edit();
+    let saved = dir.join("saved.fcproj").to_string_lossy().into_owned();
+    // a host that shows file dialogs without blocking (the desktop app on Linux), answered by hand
+    let asked: Arc<Mutex<Vec<(FileDialog, Sender<Vec<String>>)>>> = Arc::default();
+    let a = asked.clone();
+    d.app().hooks.run_dialog = Some(Box::new(move |dialog| {
+        let (tx, rx) = channel();
+        a.lock().unwrap().push((dialog, tx));
+        rx
+    }));
+    let answer = |d: &mut Driver, paths: Vec<String>| {
+        let (dialog, tx) = asked.lock().unwrap().remove(0);
+        tx.send(paths).unwrap();
+        d.frames(3);
+        dialog
+    };
+    d.menu("file.open");
+    assert!(matches!(answer(&mut d, vec![other.clone()]), FileDialog::OpenProject));
+    // the Save dialog is canceled: back to the prompt, nothing opens
+    d.click("openProject.save");
+    assert!(matches!(answer(&mut d, Vec::new()), FileDialog::SaveProject { .. }));
+    assert!(d.has("openProject.save"));
+    assert_eq!(d.path(), None);
+    // the save fails: the prompt stays, with the reason in the status line
+    let blocker = dir.join("not-a-folder");
+    std::fs::write(&blocker, b"").unwrap();
+    d.click("openProject.save");
+    answer(&mut d, vec![blocker.join("saved.fcproj").to_string_lossy().into_owned()]);
+    assert!(d.has("openProject.save"));
+    assert!(!d.app().ui.status.is_empty());
+    assert_eq!(d.path(), None);
+    assert!(d.app().session.is_dirty());
+    // the file is picked a few frames later: saved, then the chosen project opens
+    d.click("openProject.save");
+    d.frames(3);
+    assert_eq!(d.path(), None, "nothing opens before the answer");
+    answer(&mut d, vec![saved.clone()]);
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert_eq!(d.path(), Some(other.clone()));
+    assert!(!d.app().session.is_dirty());
+    d.exec("file.open", json!({"path": saved}));
+    assert_eq!(d.label(clip), Label::Yellow, "the change was saved");
+    // another project opened while the Save dialog is open: the late answer saves and opens nothing
+    d.app().session.path = None;
+    d.exec("file.newBin", json!({"name": "Late"}));
+    assert!(d.app().session.is_dirty());
+    let late = dir.join("late.fcproj").to_string_lossy().into_owned();
+    d.menu("file.open");
+    answer(&mut d, vec![other.clone()]);
+    d.click("openProject.save");
+    d.exec("file.open", json!({"path": saved}));
+    answer(&mut d, vec![late.clone()]);
+    assert!(!std::path::Path::new(&late).exists());
+    assert_eq!(d.path(), Some(saved));
+    assert!(d.app().ui.clip_dialog.is_none());
+    // the same for a new project changed while the Save dialog is open
+    d.app().session.path = None;
+    d.exec("file.newBin", json!({"name": "Late"}));
+    d.menu("file.open");
+    answer(&mut d, vec![other]);
+    d.click("openProject.save");
+    d.exec("file.newProject", json!({"name": "New"}));
+    d.exec("file.newBin", json!({"name": "Changed"}));
+    answer(&mut d, vec![late.clone()]);
+    assert!(!std::path::Path::new(&late).exists());
+    assert_eq!(d.path(), None);
+    assert!(d.app().session.is_dirty());
+    assert!(d.app().ui.clip_dialog.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }

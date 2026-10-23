@@ -324,7 +324,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut action: Option<&'static str> = None;
     let project_name = app.session.project.name.clone();
     // a never-saved project is saved through the Save dialog
-    let can_save = app.session.path.is_some() || app.hooks.pick_save.is_some();
+    let can_save = app.session.path.is_some() || crate::native_dialogs::FileDialog::SaveProject { name: String::new() }.available(&app.hooks);
     // the title is translated; the window keeps one id whatever the interface language
     let id = egui::Id::new(("clip-dialog", pre));
     egui::Window::new(title).id(id).collapsible(false).resizable(false).default_width(360.0).centered(ctx).show(ctx, |ui| {
@@ -620,6 +620,16 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             }
         }
         Some("dontSave") | Some("save") => {
+            // Open Project ▸ Save on a never-saved project: the chosen project opens once the Save
+            // dialog's file is saved, which can be a later frame (Linux)
+            if action == Some("save") && d.command == "file.open" && app.session.path.is_none() {
+                app.ui.clip_dialog = None;
+                if let Err(e) = save_then_open(app, d.clone()) {
+                    app.ui.status = e;
+                    app.ui.clip_dialog = Some(d);
+                }
+                return;
+            }
             if action == Some("save") {
                 let saved = if app.session.path.is_some() {
                     app.session.execute("file.save", json!({})).map(|_| ()).map_err(|e| e.to_string())
@@ -662,6 +672,42 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         _ => {}
     }
     app.ui.clip_dialog = Some(d);
+}
+
+/// Open Project ▸ Save on a never-saved project: the Save dialog, then `prompt`'s project opens
+/// once the file is saved. The dialog's answer runs when it arrives (the host may answer in a later
+/// frame). A canceled dialog or a failed save shows the prompt again. An answer that arrives after
+/// another project was opened, created or closed to does nothing, and one that arrives while another
+/// prompt is shown saves but leaves the opening to that prompt. Returns an error when no dialog can
+/// be shown.
+fn save_then_open(app: &mut FilmcraftApp, prompt: ClipDialogDraft) -> Result<Value, String> {
+    let name = format!("{}.fcproj", app.session.project.name);
+    // the project the dialog saves (not one opened, created or closed to meanwhile)
+    let project = app.session.project_generation;
+    app.pick(crate::native_dialogs::FileDialog::SaveProject { name }, move |app, paths| {
+        if app.session.project_generation != project {
+            return Ok(Value::Null);
+        }
+        let Some(path) = paths.into_iter().next() else {
+            if app.ui.clip_dialog.is_none() {
+                app.ui.clip_dialog = Some(prompt);
+            }
+            return Ok(Value::Null);
+        };
+        if let Err(e) = app.session.execute("file.saveAs", json!({"path": path})) {
+            app.ui.status = e.to_string();
+            if app.ui.clip_dialog.is_none() {
+                app.ui.clip_dialog = Some(prompt);
+            }
+            return Ok(Value::Null);
+        }
+        if app.ui.clip_dialog.is_none()
+            && let Err(e) = app.session.execute("file.open", prompt.params)
+        {
+            app.ui.status = e.to_string();
+        }
+        Ok(Value::Null)
+    })
 }
 
 /// The parameters sent on OK (dialog-only fields dropped or converted).

@@ -118,7 +118,7 @@ pub fn intercept_quit(app: &mut FilmcraftApp) -> bool {
         return false;
     }
     if app.ui.clip_dialog.as_ref().is_none_or(|d| d.command != "app.quit") {
-        app.ui.clip_dialog = Some(ClipDialogDraft { command: "app.quit".into(), params: json!({}), info: Value::Null, error: String::new() });
+        app.ui.clip_dialog = Some(ClipDialogDraft { command: "app.quit".into(), params: json!({}), info: asked_over(&app.session), error: String::new() });
     }
     true
 }
@@ -130,7 +130,8 @@ pub fn intercept_open(app: &mut FilmcraftApp, path: &str) -> bool {
     if !app.session.is_dirty() {
         return false;
     }
-    app.ui.clip_dialog = Some(ClipDialogDraft { command: "file.open".into(), params: json!({"path": path}), info: Value::Null, error: String::new() });
+    app.ui.clip_dialog =
+        Some(ClipDialogDraft { command: "file.open".into(), params: json!({"path": path}), info: asked_over(&app.session), error: String::new() });
     true
 }
 
@@ -243,8 +244,15 @@ fn defaults(app: &FilmcraftApp, id: &str) -> (Value, Value) {
                 json!({"duration": it.as_ref().map_or(0, |i| i.duration.0), "speed": speed.abs(), "fps": fps}),
             )
         }
+        "file.closeProject" => (json!({}), asked_over(s)),
         _ => (json!({}), Value::Null),
     }
+}
+
+/// The info of the Close Project, Open Project and Quit prompts: the project they are asked over
+/// (`Session::project_generation`). When another project replaces it, the prompt closes.
+fn asked_over(s: &filmcraft_engine::Session) -> Value {
+    json!({"project": s.project_generation})
 }
 
 fn format_name(f: AudioChannels) -> &'static str {
@@ -320,6 +328,12 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         app.ui.clip_dialog = None;
         return;
     };
+    // a save prompt asked over a project that another one has replaced since (a script opened,
+    // created or closed to it) closes without acting on the new project
+    if d.info["project"].as_u64().is_some_and(|p| p != app.session.project_generation) {
+        app.ui.clip_dialog = None;
+        return;
+    }
     let mut elems: Elems = Vec::new();
     let mut action: Option<&'static str> = None;
     let project_name = app.session.project.name.clone();

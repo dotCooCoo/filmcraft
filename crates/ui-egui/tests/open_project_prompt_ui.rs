@@ -378,3 +378,36 @@ fn open_project_save_waits_for_a_save_dialog_answered_later() {
     assert!(d.app().ui.clip_dialog.is_none());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_save_prompt_closes_when_a_script_replaces_its_project() {
+    let mut d = Driver::new();
+    let (dir, current, other) = projects(&mut d, "replaced");
+    // Open Project
+    d.edit();
+    d.open_project(&other);
+    d.exec("file.open", json!({"path": other}));
+    d.exec("file.newBin", json!({"name": "Changed"}));
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert!(!d.has("openProject.dontSave"));
+    assert_eq!(d.path(), Some(other.clone()));
+    assert!(d.app().session.is_dirty(), "the other project's change is kept");
+    // Close Project
+    d.menu("file.closeProject");
+    assert!(d.has("closeProject.dontSave"));
+    d.exec("file.open", json!({"path": current}));
+    d.exec("file.newBin", json!({"name": "Changed"}));
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert_eq!(d.path(), Some(current));
+    assert!(d.app().session.is_dirty());
+    // Quit
+    d.harness.input_mut().viewports.entry(egui::ViewportId::ROOT).or_default().events.push(egui::ViewportEvent::Close);
+    d.frames(3);
+    assert!(d.has("quit.dontSave"));
+    d.exec("file.newProject", json!({"name": "New"}));
+    d.exec("file.newBin", json!({"name": "Changed"}));
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert!(!d.app().quit_confirmed);
+    assert!(d.app().session.is_dirty());
+    let _ = std::fs::remove_dir_all(&dir);
+}

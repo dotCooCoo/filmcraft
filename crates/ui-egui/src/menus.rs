@@ -36,6 +36,8 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("app.language.russian", "Русский", ["Edit", "Language"], None),
     uic!("app.language.french", "Français", ["Edit", "Language"], None),
     uic!("app.language.indonesian", "Bahasa Indonesia", ["Edit", "Language"], None),
+    uic!("app.language.italian", "Italiano", ["Edit", "Language"], None),
+    uic!("app.language.korean", "한국어", ["Edit", "Language"], None),
     uic!("source.playback.toggle", "Source Play/Stop", [], None),
     uic!("source.playback.play", "Play Source", [], None),
     uic!("source.playback.stop", "Stop Source", [], None),
@@ -51,6 +53,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.zoomIn", "Zoom In", ["View"], Some("=")),
     uic!("view.zoomOut", "Zoom Out", ["View"], Some("-")),
     uic!("view.zoomToSequence", "Zoom to Sequence", ["View"], Some("\\")),
+    uic!("view.resetInterfaceZoom", "Reset Interface Zoom", ["View"], None),
     uic!("view.playbackRes.full", "Full", ["View", "Playback Resolution"], None),
     uic!("view.playbackRes.half", "1/2", ["View", "Playback Resolution"], None),
     uic!("view.playbackRes.quarter", "1/4", ["View", "Playback Resolution"], None),
@@ -88,6 +91,8 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("view.addGuide", "Add Guide…", ["View"], None),
     uic!("view.clearGuides", "Clear Guides", ["View"], None),
     uic!("view.snapInProgramMonitor", "Snap in Program Monitor", ["View"], None),
+    // the monitors' wrench menus only, as in the reference app
+    uic!("view.transparencyGrid", "Transparency Grid", [], None),
     uic!("view.safeMargins", "Safe Margins", ["View", "Guide Templates"], None),
     uic!("view.guideTemplates.save", "Save Guides as Template…", ["View", "Guide Templates"], None),
     uic!("view.guideTemplates.manage", "Manage Guides…", ["View", "Guide Templates"], None),
@@ -176,7 +181,7 @@ pub fn targets_source(app: &FilmcraftApp, params: &Value) -> bool {
 
 /// Execute a UI or engine command by id.
 pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
-    if id == "edit.selectAll" && crate::panels::graphics::select_all_edited_text(app) {
+    if id == "edit.selectAll" && (crate::panels::graphics::select_all_edited_text(app) || crate::panels::effect_controls::select_all_keyframes(app)) {
         return Ok(Value::Null);
     }
     if filmcraft_engine::source_monitor::source_command(id) && targets_source(app, &params) && params.get("target").is_none() {
@@ -195,6 +200,8 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             | "app.language.russian"
             | "app.language.french"
             | "app.language.indonesian"
+            | "app.language.italian"
+            | "app.language.korean"
     ) {
         // Japanese needs the craft-fonts (built with CRAFT_FONTS_DIR) or a font installed on the system
         if id == "app.language.japanese" && !crate::i18n::install_japanese_font(ctx) {
@@ -203,6 +210,10 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         // Chinese needs the Chinese fallback theme::install adds (craft-fonts or a system face)
         if id == "app.language.chinese" && !crate::i18n::chinese_font_available() {
             return Err("no Chinese font is installed on this system (for example Noto Sans CJK SC or Microsoft YaHei); the interface stays in English".into());
+        }
+        // Korean needs an installed Hangul font (none is bundled; see cjk.rs)
+        if id == "app.language.korean" && !crate::i18n::korean_font_available() {
+            return Err("no Korean font is installed on this system (for example Malgun Gothic or Noto Sans CJK KR); the interface stays in English".into());
         }
         let language = match id {
             "app.language.japanese" => crate::i18n::Language::Ja,
@@ -214,6 +225,8 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
             "app.language.russian" => crate::i18n::Language::Ru,
             "app.language.french" => crate::i18n::Language::Fr,
             "app.language.indonesian" => crate::i18n::Language::Id,
+            "app.language.italian" => crate::i18n::Language::It,
+            "app.language.korean" => crate::i18n::Language::Ko,
             _ => crate::i18n::Language::En,
         };
         // The preference is updated in memory before it is written, so a failed write (read-only
@@ -274,6 +287,12 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         return r;
     }
     if let Some(r) = crate::panels::clip_dialogs::route(app, id, &params) {
+        return r;
+    }
+    if let Some(r) = crate::panels::misc::route_history(app, ctx, id, &params) {
+        if let Err(e) = &r {
+            app.ui.status = e.clone();
+        }
         return r;
     }
     if let Some(r) = crate::panels::settings::route(app, id) {
@@ -406,6 +425,12 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         "view.zoomToSequence" => {
             app.ui.timeline.fit_pending = true;
             return Ok(Value::Null);
+        }
+        // the whole interface back to Settings ▸ Appearance ▸ UI Scale, after Ctrl+Plus or a mouse
+        // mapped to page zoom scaled it (#2253)
+        "view.resetInterfaceZoom" => {
+            let zoom = app.reset_ui_zoom(ctx);
+            return Ok(json!({"zoom": zoom}));
         }
         "mode.import" => {
             app.ui.mode = Mode::Import;
@@ -585,7 +610,13 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
     if r.is_ok() && matches!(id, "playhead.start" | "playhead.end") {
         crate::panels::timeline::reveal_playhead(app, ctx);
     }
-    if r.is_ok() && matches!(id, "edit.copy" | "edit.cut") {
+    let filled_clipboard = match id {
+        "edit.copy" | "edit.cut" => r.is_ok(),
+        // over a range with no clips on the targeted tracks they leave the clipboard (and the OS one) as it was
+        "sequence.lift" | "sequence.extract" => r.as_ref().is_ok_and(|v| v["copied"].as_u64().is_some_and(|n| n > 0)),
+        _ => false,
+    };
+    if filled_clipboard {
         remember_stale_clipboard_media(app);
         put_clip_names_on_system_clipboard(app, ctx);
     }
@@ -689,6 +720,8 @@ pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
             "app.language.russian" => it.checked = Some(app.ui.language == crate::i18n::Language::Ru),
             "app.language.french" => it.checked = Some(app.ui.language == crate::i18n::Language::Fr),
             "app.language.indonesian" => it.checked = Some(app.ui.language == crate::i18n::Language::Id),
+            "app.language.italian" => it.checked = Some(app.ui.language == crate::i18n::Language::It),
+            "app.language.korean" => it.checked = Some(app.ui.language == crate::i18n::Language::Ko),
             _ => {}
         }
         if it.id.starts_with("view.") {
@@ -834,6 +867,16 @@ pub fn bindings(app: &FilmcraftApp) -> Vec<KeyBinding> {
     let shifted: Vec<KeyBinding> =
         v.iter().filter(|b| b.0.shift).filter_map(|(m, k, id, p)| shifted_key(*k).map(|k2| (*m, k2, id.clone(), p.clone()))).collect();
     v.extend(shifted);
+    // `+` is the `=` key with Shift on US layouts and its own key on others and the keypad: a chord
+    // on `=` takes it too, unless something is bound to `+` itself. Otherwise Ctrl+Plus fell
+    // through to egui's interface zoom while Ctrl+- and Ctrl+0 were taken by FilmCraft
+    // shortcuts, so the interface grew and could not shrink back (#2253).
+    let plus: Vec<KeyBinding> = v
+        .iter()
+        .filter(|(m, k, _, p)| *k == egui::Key::Equals && !v.iter().any(|(m2, k2, _, p2)| *k2 == egui::Key::Plus && m2 == m && p2 == p))
+        .map(|(m, _, id, p)| (*m, egui::Key::Plus, id.clone(), p.clone()))
+        .collect();
+    v.extend(plus);
     v.sort_by_key(|(m, ..)| std::cmp::Reverse(specificity(*m)));
     v
 }
@@ -879,7 +922,8 @@ pub fn menu_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
     let labels = app.session.prefs.labels.clone();
     let ctx = ui.ctx().clone();
     let mut clicked: Option<String> = None;
-    egui::MenuBar::new().config(egui::containers::menu::MenuConfig::new().style(crate::theme::menu_style)).ui(ui, |ui| {
+    // The bar's titles and their menus share one size and colour, as in a native menu bar.
+    egui::MenuBar::new().style(crate::theme::menu_style).config(egui::containers::menu::MenuConfig::new().style(crate::theme::menu_style)).ui(ui, |ui| {
         let mut titles = Vec::with_capacity(MENUS.len());
         for top in MENUS {
             let mine: Vec<&MenuItem> = items.iter().filter(|i| i.path.first().map(String::as_str) == Some(top)).collect();

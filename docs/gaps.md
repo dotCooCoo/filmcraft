@@ -27,7 +27,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 | G11 | No plugin hosting | ecosystem | no | 200–400 h |
 | G12 | AI features | AI | no | 150–300 h |
 | G13 | Delivery formats | file format | no | 60–110 h |
-| G14 | Localization: 8 of the 12 key languages missing | localization | no | 150–230 h |
+| G14 | Localization: 3 of the 12 key languages missing | localization | no | 150–230 h |
 | G15 | Interchange never validated in Avid / Pro Tools; slow XML import | file format | partly | 20–40 h |
 | G16 | Performance reports on 0.5.0 | performance | partly | 30–60 h |
 | G17 | Audio device and playback reliability | stability | partly | 20–40 h |
@@ -119,7 +119,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 
 ## G6. No real-world media corpus or workflow acceptance tests
 
-- **Done:** first scripted MCP workflows (#835, `apps/filmcraft-cli/tests/workflows.rs`): the
+- **Done:** first scripted MCP workflows (#835, `apps/filmcraft-cli/tests/it/workflows.rs`): the
   `filmcraft-cli mcp` binary imports ffmpeg-made phone-like VFR H.264 + AAC MP4 and long-GOP
   H.264 Matroska with two audio tracks (AAC, AC-3), edits (extract, audio gain, title; ripple
   trims, colour matte, cross dissolve), exports H.264 MP4, and saves a project that a new process
@@ -161,8 +161,8 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   rearrangement (#493); clicking empty space to deselect (#683); filmstrip thumbnails (#614);
   marquee selection in the Project panel (#578); Freeform bins and middle-mouse pan (#579);
   Program monitor Button Editor (+) (#431); keyframe curves for Position (#448); transition
-  editing controls (#577: Effect Controls has the transition's own timeline, drag to slide or resize;
-  the A/B previews with Start / End sliders remain); track renaming (#654); window controls on macOS (#637); UI scale on
+  editing controls (#577: Effect Controls has the transition's own timeline, drag to slide or resize,
+  drag the cut to move it with the transition; the A/B previews with Start / End sliders remain); track renaming (#654); window controls on macOS (#637); UI scale on
   X11 (#457).
 - **Estimate:** 120–200 h. Doc: [ui-parity.md](ui-parity.md).
 
@@ -185,14 +185,15 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   384 kbit/s). Radiance HDR (`.hdr`) stills and image sequences (#1407): RGBE as linear float, flat
   and run-length scan lines, any axis order. OpenEXR stills and image
   sequences (#828): scan-line, uncompressed / RLE / ZIPS / ZIP, half / float / uint, RGB(A) or
-  luminance, decoded to linear float frames and bit-exact against ffmpeg.
+  luminance, decoded to linear float frames and bit-exact against ffmpeg; PXR24 (lossy 24-bit
+  float, 16 lines per chunk) decodes too, bit-exact against OpenEXR (via OpenImageIO, #828).
 - **Missing:** free-format MPEG audio, E-AC-3 adaptive hybrid
   transform, enhanced coupling and the extra channels of 7.1 dependent substreams (played as the
   5.1 core), AVI (#598; listed as an extension but no
   demuxer), WMV / ASF, DV / DVCPRO / DV100, MPEG-4 Part 2, FLAC in MP4 (#603), camera RAW (R3D
   incl. R3D NE, ARRIRAW, Sony RAW / X-OCN, Canon RAW, BRAW, ProRes RAW; #345, #383), JPEG 2000 /
   JPEG XS MXF, the rest of CinemaDNG (lossy / JPEG XL DNG, MXF-wrapped, opcode lists, Raw
-  settings; DNG frames and folders import since #1065); stills: PSD, EXR beyond scan-line RLE / ZIP (PIZ, PXR24, B44, DWA,
+  settings; DNG frames and folders import since #1065); stills: PSD, EXR beyond scan-line RLE / ZIP / PXR24 (PIZ, B44, DWA,
   tiled, multi-part, deep), HEIF / HEIC,
   AI / EPS, and the rarer DPX layout, run-length encoding (Targa and DPX stills and sequences import
   since #821, packed 10/12-bit and Y'CbCr DPX since #841, deeper than 8 bits kept at 8); transparent
@@ -230,19 +231,26 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   (audio-only `.m4a`, or ADTS `.aac`; #814); ProRes 4444 / 4444 XQ in the export UI (#342).
 - **Estimate:** 60–110 h. Doc: [file-format-parity.md](file-format-parity.md).
 
-## G14. Localization: 8 of the 12 key languages missing
+## G14. Localization: 3 of the 12 key languages missing (Hindi, Arabic, Vietnamese)
 
 - **Have:** Spanish, Japanese, Simplified Chinese, French (#498) and Portuguese (Brazil) (#859)
   catalogs cover ~99.6–100% of the ~3,500 cataloged strings; Ukrainian ~10% (menus).
 - **Missing:** Hindi, Arabic (no RTL interface layout or catalog; the interface has Arabic and Hebrew
   fallback fonts and shows captions in reading order, but other names and fields keep egui's
   left-to-right run order; Arabic titles reported broken, #395),
-  German beyond menus (#490), Korean (#508; needs Hangul fonts in craft-fonts),
-  Vietnamese; Premiere also ships Italian and Russian. Engine errors,
-  CLI and MCP stay English. No language has a recorded native-speaker review.
+  Korean (#508; needs Hangul fonts in craft-fonts),
+  Vietnamese; Premiere also ships Russian. Engine errors,
+  CLI and MCP stay English. Apart from the German menus (#630), no language has a recorded
+  native-speaker review.
 - **Done:** Indonesian (#867): `id.tsv` has every entry of the Spanish catalog (~100%), in Edit ▸
   Language, Settings ▸ General and the native macOS menu; System Language picks it for `id-*` (and
   legacy `in-*`) locales. Native-speaker review welcome.
+- **Done:** Italian: `it.tsv` has every entry of the Spanish catalog (~100%), in Edit ▸ Language,
+  Settings ▸ General and the native macOS menu; System Language picks it for `it-*` locales.
+  Native-speaker review welcome.
+- **Done:** German: `de.tsv` has every entry of the Spanish catalog (~100%), beyond the menus of
+  #630 (panels, dialogs, effects and their parameters, settings, status messages). The menus are
+  native-reviewed; review of the rest welcome.
 - **Estimate:** 150–230 h. Doc: [localization-parity.md](localization-parity.md).
 
 ## G15. Interchange never validated in Avid / Pro Tools; slow XML import
@@ -290,7 +298,9 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   with circular fillets (`masks.add` `cornerRadius`, `masks.roundCorners`, every path keyframe;
   #813), from an on-monitor corner-roundness handle with a live preview (one undo step per drag;
   #844); Shift snaps pen mask segments and dragged-out Bézier handles to 45° steps (#853), and
-  Shift constrains vertex and whole-mask drags to 45° steps from the press point (#1408).
+  Shift constrains vertex and whole-mask drags to 45° steps from the press point (#1408); a
+  marquee or Shift-click selects several vertices on the Program monitor, and dragging any of
+  them moves them all in one undo step (#3150).
 - **Estimate:** 60–110 h.
 
 ## G19. Speech to text off in release builds
@@ -311,3 +321,5 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 |---|---|---|
 | 2026-10-10 | major | Created from ROADMAP.md's "Where we are lacking" (2026-10-05); re-ranked against Premiere 26.5.2 and the 188 open issues; added `.prproj`, 10-bit / 4:2:2 camera decode, launch crashes and missing PR CI, localization, delivery formats |
 | 2026-10-12 | minor | G10: MP1 (`A_MPEG/L1`) in Matroska imports (#1402) |
+| 2026-10-12 | minor | G10: OpenEXR PXR24 import |
+| 2026-10-24 | minor | G8: dragging the cut on a transition's timeline in Effect Controls moves the cut, and the transition moves with it (#577) |

@@ -33,6 +33,9 @@ fn system_font() -> Option<Arc<FontData>> {
     FONT.get_or_init(|| find_system_font(SAMPLE, PREFERRED)).clone()
 }
 
+/// The font-data name of the installed Hangul face [`install`] appends to every family.
+pub(crate) const KOREAN_FACE: &str = "system-korean";
+
 fn korean_font() -> Option<Arc<FontData>> {
     static FONT: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
     FONT.get_or_init(|| find_system_font(KOREAN_SAMPLE, KOREAN_PREFERRED)).clone()
@@ -53,6 +56,12 @@ fn find_system_font(sample: &str, preferred: &[&str]) -> Option<Arc<FontData>> {
     Some(Arc::new(FontData { font: std::borrow::Cow::Owned(face.data()?), index: face.info.index, tweak: Default::default() }))
 }
 
+/// Whether [`install`] has a Hangul face to add (an installed system face; none is bundled).
+/// The Korean interface needs one.
+pub(crate) fn korean_available() -> bool {
+    korean_font().is_some()
+}
+
 /// Whether [`install`] has a Chinese face to add: craft-fonts Hans/Hant faces, or an installed
 /// system face (scanned once per process). The Simplified Chinese interface needs one.
 pub(crate) fn available() -> bool {
@@ -65,9 +74,9 @@ pub(crate) fn available() -> bool {
 pub(crate) fn install(fonts: &mut FontDefinitions) {
     install_chinese(fonts);
     if let Some(font) = korean_font() {
-        fonts.font_data.insert("system-korean".into(), font);
+        fonts.font_data.insert(KOREAN_FACE.into(), font);
         for stack in fonts.families.values_mut() {
-            stack.push("system-korean".into());
+            stack.push(KOREAN_FACE.into());
         }
     }
 }

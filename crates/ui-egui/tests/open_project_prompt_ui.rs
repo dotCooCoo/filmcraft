@@ -244,6 +244,13 @@ fn home_recent_with_unsaved_changes_asks_first() {
     let i = d.recent(&other);
     d.click(&format!("import.recent.{i}"));
     assert_eq!(d.path(), Some(current.clone()), "nothing opens before an answer");
+    assert_eq!(d.app().ui.mode, Mode::Import, "Home stays while it asks");
+    // Cancel: Home stays, with this project and its changes
+    d.click("openProject.cancel");
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert_eq!((d.path(), d.app().ui.mode), (Some(current.clone()), Mode::Import));
+    assert!(d.app().session.is_dirty());
+    d.click(&format!("import.recent.{i}"));
     assert!(d.has("openProject.dontSave"));
     d.click("openProject.dontSave");
     assert!(d.app().ui.clip_dialog.is_none());
@@ -253,6 +260,25 @@ fn home_recent_with_unsaved_changes_asks_first() {
     // the project the change was made in is as it was saved
     d.exec("file.open", json!({"path": current}));
     assert_eq!(d.label(clip), first.label);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn home_recent_save_on_a_never_saved_project_switches_to_edit_once_it_opens() {
+    let mut d = Driver::new();
+    let (dir, _, other) = projects(&mut d, "homeNeverSaved");
+    d.app().session.path = None;
+    d.edit();
+    let saved = dir.join("saved.fcproj").to_string_lossy().into_owned();
+    d.app().hooks.pick_save = Some(Box::new(move |_| Some(saved.clone())));
+    d.click("header.home");
+    let i = d.recent(&other);
+    d.click(&format!("import.recent.{i}"));
+    assert_eq!(d.app().ui.mode, Mode::Import);
+    d.click("openProject.save");
+    assert!(d.app().ui.clip_dialog.is_none());
+    assert_eq!(d.path(), Some(other));
+    assert_eq!(d.app().ui.mode, Mode::Edit);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

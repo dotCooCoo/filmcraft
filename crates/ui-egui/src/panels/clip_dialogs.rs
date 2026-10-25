@@ -664,8 +664,9 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             // Open Project opens the chosen project; when that fails, this project stays open with
             // its unsaved changes
             if d.command == "file.open" {
-                if let Err(e) = app.session.execute("file.open", d.params.clone()) {
-                    app.ui.status = e.to_string();
+                match app.session.execute("file.open", d.params.clone()) {
+                    Ok(_) => edit_after_open(app, &d),
+                    Err(e) => app.ui.status = e.to_string(),
                 }
                 app.ui.clip_dialog = None;
                 return;
@@ -715,13 +716,22 @@ fn save_then_open(app: &mut FilmcraftApp, prompt: ClipDialogDraft) -> Result<Val
             }
             return Ok(Value::Null);
         }
-        if app.ui.clip_dialog.is_none()
-            && let Err(e) = app.session.execute("file.open", prompt.params)
-        {
-            app.ui.status = e.to_string();
+        if app.ui.clip_dialog.is_none() {
+            match app.session.execute("file.open", prompt.params.clone()) {
+                Ok(_) => edit_after_open(app, &prompt),
+                Err(e) => app.ui.status = e.to_string(),
+            }
         }
         Ok(Value::Null)
     })
+}
+
+/// A Recent row on Home asked (`editAfterOpen`): the project it chose is open, so Home switches to
+/// Edit, as it does when no prompt was needed.
+fn edit_after_open(app: &mut FilmcraftApp, prompt: &ClipDialogDraft) {
+    if prompt.info["editAfterOpen"].as_bool() == Some(true) {
+        app.ui.mode = crate::state::Mode::Edit;
+    }
 }
 
 /// The parameters sent on OK (dialog-only fields dropped or converted).

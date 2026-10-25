@@ -431,11 +431,11 @@ pub struct Session {
     pub project: Arc<Project>,
     pub history: History,
     pub revision: u64,
+    /// Bumped whenever the session installs a different project document (`file.newProject`,
+    /// open/import/recovery/template). Frontends use it to discard UI state (text edits, IME
+    /// owners) that belongs to the replaced document even if item ids are reused.
+    pub document_epoch: u64,
     pub saved_revision: u64,
-    /// Counts the projects this session has held: it changes when another project replaces this
-    /// one (open, new, close), never with an edit. Work that finishes later (a file dialog's
-    /// answer) checks it is still for the same project.
-    pub project_generation: u64,
     pub path: Option<String>,
     pub state: EditorState,
     pub media: Arc<MediaPool>,
@@ -553,8 +553,8 @@ impl Session {
             project: Arc::new(Project::new("Untitled")),
             history: History { limit: 200, ..Default::default() },
             revision: 1,
+            document_epoch: 0,
             saved_revision: 1,
-            project_generation: 0,
             path: None,
             state: EditorState {
                 snapping: true,

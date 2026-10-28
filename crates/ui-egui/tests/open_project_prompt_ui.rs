@@ -165,6 +165,26 @@ fn open_project_save_saves_the_changes_then_opens_the_chosen_project() {
 }
 
 #[test]
+fn open_project_save_that_fails_keeps_the_project_and_its_changes() {
+    let mut d = Driver::new();
+    let (dir, _current, other) = projects(&mut d, "saveFails");
+    let clip = d.edit();
+    // the project's file can't be written: its folder is a file
+    let blocker = dir.join("not-a-folder");
+    std::fs::write(&blocker, b"").unwrap();
+    let unwritable = blocker.join("current.fcproj").to_string_lossy().into_owned();
+    d.app().session.path = Some(unwritable.clone());
+    d.open_project(&other);
+    d.click("openProject.save");
+    assert!(!d.app().ui.status.is_empty(), "the reason shows in the status line");
+    assert!(d.app().ui.clip_dialog.is_none(), "the prompt closes");
+    assert_eq!(d.path(), Some(unwritable), "the chosen project does not open");
+    assert!(d.app().session.is_dirty());
+    assert_eq!(d.label(clip), Label::Yellow, "the change is kept");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn open_project_dont_save_opens_the_chosen_project_without_saving() {
     let mut d = Driver::new();
     let (dir, current, other) = projects(&mut d, "dontSave");

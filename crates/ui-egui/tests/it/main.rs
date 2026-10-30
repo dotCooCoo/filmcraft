@@ -1,6 +1,7 @@
 mod audio51_ui;
 mod audio_fx_editor_ui;
 mod caption_copy_paste_ui;
+mod caption_export_ui;
 mod caption_list_follow_ui;
 mod caption_option_drag_ui;
 mod caption_properties_ui;
@@ -44,6 +45,7 @@ mod native_windows_ui;
 mod nest_editing_ui;
 mod nest_rendering_ui;
 mod nested_ui;
+mod open_project_prompt_ui;
 mod panels_ui;
 mod par_ui;
 mod perf_ui;

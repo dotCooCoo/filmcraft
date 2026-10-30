@@ -344,8 +344,13 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut elems: Elems = Vec::new();
     let mut action: Option<&'static str> = None;
     let project_name = app.session.project.name.clone();
-    // a never-saved project is saved through the Save dialog
-    let can_save = app.session.path.is_some() || crate::native_dialogs::FileDialog::SaveProject { name: String::new() }.available(&app.hooks);
+    // only open resumes after an asynchronous save dialog
+    let can_save = app.session.path.is_some()
+        || if d.command == "file.open" {
+            crate::native_dialogs::FileDialog::SaveProject { name: String::new() }.available(&app.hooks)
+        } else {
+            app.hooks.pick_save.is_some()
+        };
     // the title is translated; the window keeps one id whatever the interface language
     let id = egui::Id::unique(("clip-dialog", pre));
     egui::Window::new(title).id(id).collapsible(false).resizable(false).default_width(360.0).centered(ctx).show(ctx, |ui| {

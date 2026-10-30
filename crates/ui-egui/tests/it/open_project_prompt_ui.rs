@@ -3,6 +3,7 @@
 //! Save before it opens.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
 
@@ -426,6 +427,29 @@ fn open_project_save_waits_for_a_save_dialog_answered_later() {
     assert!(d.app().session.is_dirty());
     assert!(d.app().ui.clip_dialog.is_none());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn asynchronous_save_is_enabled_only_for_open_project_on_a_never_saved_project() {
+    let mut d = Driver::new();
+    d.app().session.path = None;
+    d.edit();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = calls.clone();
+    d.app().hooks.run_dialog = Some(Box::new(move |_| {
+        count.fetch_add(1, Ordering::SeqCst);
+        let (_tx, rx) = channel();
+        rx
+    }));
+    d.menu("file.closeProject");
+    d.click("closeProject.save");
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "disabled Save does not launch a dialog");
+    assert!(d.has("closeProject.save"));
+    d.click("closeProject.cancel");
+    assert!(filmcraft_ui_egui::panels::clip_dialogs::intercept_open(d.app(), "other.fcproj"));
+    d.frames(3);
+    d.click("openProject.save");
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "enabled Save launches a dialog");
 }
 
 #[test]

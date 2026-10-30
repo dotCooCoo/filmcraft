@@ -189,6 +189,38 @@ fn open_project_failed_save_keeps_the_prompt_and_chosen_project() {
 }
 
 #[test]
+fn close_project_and_quit_failed_save_keep_the_prompt() {
+    for (command, prompt) in [("file.closeProject", "closeProject"), ("app.quit", "quit")] {
+        let mut d = Driver::new();
+        let (dir, _, _) = projects(&mut d, prompt);
+        let folder = dir.join("current-folder");
+        std::fs::create_dir(&folder).unwrap();
+        let current = folder.join("current.fcproj").to_string_lossy().into_owned();
+        d.exec("file.saveAs", json!({"path": current}));
+        let clip = d.edit();
+        std::fs::remove_dir_all(&folder).unwrap();
+        std::fs::write(&folder, b"not a folder").unwrap();
+
+        if command == "app.quit" {
+            d.harness.input_mut().viewports.entry(egui::ViewportId::ROOT).or_default().events.push(egui::ViewportEvent::Close);
+            d.frames(3);
+        } else {
+            d.menu(command);
+        }
+        let save = format!("{prompt}.save");
+        assert!(d.has(&save), "{command} shows its save prompt");
+        d.click(&save);
+        assert!(d.has(&save), "{command} keeps its prompt after a failed save");
+        assert_eq!(d.path(), Some(current.clone()));
+        assert!(d.app().session.is_dirty());
+        assert_eq!(d.label(clip), Label::Yellow, "{command} keeps the change");
+        assert!(d.app().ui.status.contains(&current), "{command} shows the save error: {}", d.app().ui.status);
+        assert!(!d.app().quit_confirmed, "{command} does not confirm a quit");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[test]
 fn open_project_dont_save_opens_the_chosen_project_without_saving() {
     let mut d = Driver::new();
     let (dir, current, other) = projects(&mut d, "dontSave");

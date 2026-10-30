@@ -664,7 +664,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 };
                 if let Err(e) = saved {
                     app.ui.status = e;
-                    app.ui.clip_dialog = if d.command == "file.open" { Some(d) } else { None };
+                    app.ui.clip_dialog = Some(d);
                     return;
                 }
                 // the Save dialog was cancelled: back to the prompt

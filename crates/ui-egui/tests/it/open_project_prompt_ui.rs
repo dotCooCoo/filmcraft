@@ -165,6 +165,29 @@ fn open_project_save_saves_the_changes_then_opens_the_chosen_project() {
 }
 
 #[test]
+fn open_project_failed_save_keeps_the_prompt_and_chosen_project() {
+    let mut d = Driver::new();
+    let (dir, _, other) = projects(&mut d, "failedSave");
+    let folder = dir.join("current-folder");
+    std::fs::create_dir(&folder).unwrap();
+    let current = folder.join("current.fcproj").to_string_lossy().into_owned();
+    d.exec("file.saveAs", json!({"path": current}));
+    let clip = d.edit();
+    std::fs::remove_dir_all(&folder).unwrap();
+    std::fs::write(&folder, b"not a folder").unwrap();
+
+    d.open_project(&other);
+    d.click("openProject.save");
+    assert!(d.has("openProject.save"), "the prompt stays open after a failed save");
+    assert_eq!(d.app().ui.clip_dialog.as_ref().unwrap().params["path"], json!(other));
+    assert_eq!(d.path(), Some(current.clone()));
+    assert!(d.app().session.is_dirty());
+    assert_eq!(d.label(clip), Label::Yellow);
+    assert!(d.app().ui.status.contains(&current), "the status shows the save error: {}", d.app().ui.status);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn open_project_dont_save_opens_the_chosen_project_without_saving() {
     let mut d = Driver::new();
     let (dir, current, other) = projects(&mut d, "dontSave");

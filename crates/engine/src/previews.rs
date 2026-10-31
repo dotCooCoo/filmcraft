@@ -62,7 +62,8 @@ pub struct BarSpan {
 /// Which segments a render command picks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RenderMode {
-    /// Red and yellow segments in In/Out (Enter).
+    /// Red segments in In/Out (Enter), as in Premiere: yellow ones should play in real time, and
+    /// rendering them too can take hours of encoding on a long sequence (#1220).
     EffectsInToOut,
     /// Every segment in In/Out, including no-bar ones.
     InToOut,
@@ -72,6 +73,18 @@ pub enum RenderMode {
     EntireWorkArea,
     /// Segments showing a selected clip.
     Selection,
+}
+
+impl RenderMode {
+    /// Whether this mode renders a segment whose playback needs `need` (In/Out and the selection
+    /// aside).
+    pub fn renders(self, need: Need) -> bool {
+        match self {
+            RenderMode::EffectsInToOut | RenderMode::EffectsInWorkArea => need == Need::Render,
+            RenderMode::EntireWorkArea => matches!(need, Need::Render | Need::Realtime),
+            RenderMode::InToOut | RenderMode::Selection => true,
+        }
+    }
 }
 
 type Memo = (Arc<Project>, ItemId, Arc<Vec<Segment>>);
@@ -634,23 +647,6 @@ pub(crate) fn work_area(s: &Session) -> Result<(ItemId, TimeRange)> {
     Ok((id, range))
 }
 
-/// Which render-bar needs are eligible within a range.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RenderFilter {
-    Red,
-    RedOrYellow,
-    Any,
-}
-
-pub(crate) fn render_bounds(seg: &Segment, rate: FrameRate, range: &TimeRange, filter: RenderFilter) -> Option<(i64, i64)> {
-    let selected = match filter {
-        RenderFilter::Red => seg.need == Need::Render,
-        RenderFilter::RedOrYellow => matches!(seg.need, Need::Render | Need::Realtime),
-        RenderFilter::Any => true,
-    };
-    selected.then(|| rel_range(seg, rate, range))
-}
-
 /// One preview file to render: frames `off..off + len` of segment `seg` (from its start).
 struct Todo {
     seg: Segment,
@@ -673,22 +669,22 @@ pub fn render(s: &mut Session, mode: RenderMode, p: &Value) -> Result<Value> {
     let segs = store.segments(&s.project, seq);
     let selection: HashSet<_> = s.state.selection.iter().copied().collect();
     let mut todo: Vec<Todo> = Vec::new();
-    for g in segs.iter() {
-        let bounds = match mode {
-            RenderMode::EffectsInToOut => render_bounds(g, rate, &range, RenderFilter::RedOrYellow),
-            RenderMode::InToOut => render_bounds(g, rate, &range, RenderFilter::Any),
-            RenderMode::EffectsInWorkArea => render_bounds(g, rate, &range, RenderFilter::Red),
-            RenderMode::EntireWorkArea => render_bounds(g, rate, &range, RenderFilter::RedOrYellow),
-            RenderMode::Selection if g.clips.iter().any(|c| selection.contains(c)) => Some((0, g.frames.max(0))),
-            RenderMode::Selection => None,
+    for g in segs.iter().filter(|g| mode.renders(g.need)) {
+        let (a, b) = match mode {
+            RenderMode::EffectsInToOut | RenderMode::InToOut | RenderMode::EffectsInWorkArea | RenderMode::EntireWorkArea => rel_range(g, rate, &range),
+            RenderMode::Selection if g.clips.iter().any(|c| selection.contains(c)) => (0, g.frames.max(0)),
+            RenderMode::Selection => continue,
         };
-        let Some((a, b)) = bounds else { continue };
         for (off, end) in gaps(&store.coverage(g), a, b) {
             todo.push(Todo { seg: g.clone(), off, len: end - off });
         }
     }
     if todo.is_empty() {
-        s.toast("Nothing to render: previews are up to date");
+        s.toast(if mode == RenderMode::EffectsInToOut {
+            "Nothing to render: no red segments without previews between In and Out"
+        } else {
+            "Nothing to render: previews are up to date"
+        });
         return Ok(json!({"job": null, "segments": 0}));
     }
     std::fs::create_dir_all(&dir).map_err(|e| EngineError::Other(format!("preview folder {}: {e}", dir.display())))?;
@@ -702,8 +698,9 @@ pub fn render(s: &mut Session, mode: RenderMode, p: &Value) -> Result<Value> {
     };
     job.progress.total.store(frames.max(1) as u64, Ordering::Relaxed);
     let project = s.project.clone();
-    // Previews are cached by content and reused with proxies on or off: always full resolution.
-    let provider = s.media.full_res_provider(project.clone(), s.services.clone());
+    // Previews are cached by content and reused with proxies on or off: always full resolution,
+    // from their own copies of the files so the monitors keep their decoders.
+    let provider = s.media.full_res_provider(project.clone(), s.services.clone()).own_sources();
     let (prog, res) = (job.progress.clone(), job.result.clone());
     let nseg = todo.len();
     let run = move || {
@@ -804,7 +801,7 @@ pub fn render_audio(s: &mut Session, p: &Value) -> Result<Value> {
     let job = crate::Job { id, label: "Rendering audio previews".into(), progress: Default::default(), result: Default::default() };
     job.progress.total.store(total.max(1) as u64, Ordering::Relaxed);
     let project = s.project.clone();
-    let provider = s.media.full_res_provider(project.clone(), s.services.clone());
+    let provider = s.media.full_res_provider(project.clone(), s.services.clone()).own_sources();
     let (prog, res) = (job.progress.clone(), job.result.clone());
     let nseg = todo.len();
     let run = move || {

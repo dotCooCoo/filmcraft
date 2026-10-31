@@ -87,8 +87,8 @@ pub fn history(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let undo: Vec<(String, Icon)> = app.session.history.undo.iter().map(|h| (h.0.clone(), history_icon(h.2.as_deref()))).collect();
     let redo: Vec<(String, Icon)> = app.session.history.redo.iter().rev().map(|h| (h.0.clone(), history_icon(h.2.as_deref()))).collect();
     let mut target: Option<i64> = None;
-    // the rect, label and icon of each row drawn, oldest first
-    let mut shown: Vec<(Rect, String, Option<Icon>)> = Vec::new();
+    // the visible rect and label of each row drawn, oldest first, with its icon and the icon's visible rect
+    let mut shown: Vec<(Rect, String, Option<(Icon, Rect)>)> = Vec::new();
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(&mut child, |ui| {
         let mut row = |ui: &mut egui::Ui, label: &str, icon: Option<Icon>, current: bool, dim: bool| -> bool {
             let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 20.0), Sense::click());
@@ -101,7 +101,8 @@ pub fn history(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 icons::paint(ui.painter(), history_icon_rect(r), icon, if dim { t.text_faint } else { t.icon });
             }
             ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, label, Tokens::ui(12.0), if dim { t.text_faint } else { t.text });
-            shown.push((r.intersect(ui.clip_rect()), label.to_string(), icon));
+            let clip = ui.clip_rect();
+            shown.push((r.intersect(clip), label.to_string(), icon.map(|icon| (icon, history_icon_rect(r).intersect(clip)))));
             resp.clicked()
         };
         if row(ui, tl!("Open"), None, undo.is_empty(), false) {
@@ -124,8 +125,10 @@ pub fn history(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             continue;
         }
         app.auto.add(&format!("history.row.{n}"), r, &label);
-        if let Some(icon) = icon {
-            app.auto.add(&format!("history.row.{n}.icon"), history_icon_rect(r), &format!("{icon:?}"));
+        if let Some((icon, icon_rect)) = icon
+            && icon_rect.is_positive()
+        {
+            app.auto.add(&format!("history.row.{n}.icon"), icon_rect, &format!("{icon:?}"));
         }
     }
     if let Some(n) = target {

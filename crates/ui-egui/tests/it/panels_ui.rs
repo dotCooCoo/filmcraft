@@ -85,6 +85,19 @@ impl Driver {
         v.as_array().unwrap().iter().filter_map(|e| e["id"].as_str().map(str::to_string)).collect()
     }
 
+    /// The id and rect of each automation element whose id starts with `prefix`.
+    fn rects(&mut self, prefix: &str) -> Vec<(String, egui::Rect)> {
+        let v = self.ok("ui.elements", json!({"prefix": prefix}));
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let r: Vec<f32> = e["rect"].as_array().unwrap().iter().map(|x| x.as_f64().unwrap() as f32).collect();
+                (e["id"].as_str().unwrap().to_string(), egui::Rect::from_min_size(egui::pos2(r[0], r[1]), egui::vec2(r[2], r[3])))
+            })
+            .collect()
+    }
+
     fn has(&mut self, id: &str) -> bool {
         self.ids(id).iter().any(|i| i == id)
     }
@@ -276,6 +289,40 @@ fn history_rows_show_the_command_icon() {
     d.click(&bin);
     assert_eq!(d.app().session.history.redo.len(), 1);
     assert_eq!(d.label(&format!("{marker}.icon")), "Marker", "the icon stays with its row through undo");
+}
+
+/// On a History row partly scrolled out of the panel, the `.icon` target is the part of the drawn
+/// icon that still shows: it lies inside its row, at the drawn icon's left edge, and it is not
+/// registered once the icon itself is scrolled out.
+#[test]
+fn history_icon_targets_follow_rows_scrolled_part_out() {
+    let mut d = Driver::demo();
+    for i in 0..60 {
+        d.exec("file.newBin", json!({"name": format!("Bin {i}")}));
+    }
+    d.ok("ui.menu.invoke", json!({"id": "window.panel.History"}));
+    d.frames(3);
+    let mut clipped = 0;
+    for _ in 0..40 {
+        let rects = d.rects("history.row.");
+        let rows: Vec<&(String, egui::Rect)> = rects.iter().filter(|(id, _)| !id.ends_with(".icon")).collect();
+        for (id, row) in &rows {
+            let icon = rects.iter().find(|(i, _)| *i == format!("{id}.icon")).map(|(_, r)| *r);
+            if row.height() < 19.5 {
+                clipped += 1;
+            }
+            let Some(icon) = icon else { continue };
+            let inside = row.expand(0.01).contains_rect(icon);
+            assert!(inside, "{id}: icon {icon:?} outside its row {row:?}");
+            assert!((icon.min.x - (row.min.x + 6.0)).abs() < 0.01, "{id}: icon {icon:?} is not at the drawn icon's left edge in {row:?}");
+            assert!(icon.height() <= 14.01 && icon.height() > 0.0, "{id}: icon {icon:?}");
+        }
+        let Some((last, _)) = rows.last() else { panic!("no History rows") };
+        let last = last.clone();
+        d.ok("ui.scroll", json!({"id": last, "dy": -7.0}));
+        d.frames(3);
+    }
+    assert!(clipped > 0, "no row was ever partly scrolled out");
 }
 
 /// The wheel over a tab strip switches that group's tab: down = next, up = previous, one tab per

@@ -10,12 +10,13 @@ use crate::theme::Tokens;
 
 /// History icons for undoable commands that a timeline tool runs: the tool's icon.
 const HISTORY_TOOL_COMMANDS: &[(&[&str], Tool)] = &[
-    (&["timeline.move", "timeline.trim", "timeline.place", "timeline.setTrack"], Tool::Selection),
+    (&["timeline.move", "timeline.trim", "timeline.place", "timeline.setTrack", "trim.previous", "trim.next"], Tool::Selection),
     (&["timeline.razor", "sequence.addEdit", "sequence.addEditAllTracks", "multicam.cut"], Tool::Razor),
     (&["timeline.roll"], Tool::Rolling),
     (&["timeline.rateStretch"], Tool::RateStretch),
     (&["clip.remix"], Tool::Remix),
     (&["edit.rippleDelete", "edit.rippleDeleteHead", "sequence.closeGap", "trim.rippleNext", "trim.ripplePrevious"], Tool::Ripple),
+    (&[filmcraft_engine::trim::RIPPLE_TRIM_ORIGIN], Tool::Ripple),
     (&["graphics.newText", "graphics.newVerticalText", "graphics.setText", "graphics.setCharStyle"], Tool::Type),
     (&["graphics.newRectangle"], Tool::Rectangle),
     (&["graphics.newEllipse"], Tool::Ellipse),
@@ -545,19 +546,24 @@ mod tests {
         assert_eq!(history_icon(Some("markers.add")), Icon::Marker);
         assert_eq!(history_icon(Some("markers.markIn")), Icon::MarkIn, "an exact entry comes before its family");
         assert_eq!(history_icon(Some("trim.rippleNext")), Tool::Ripple.icon(), "an exact entry comes before its family");
+        assert_eq!(history_icon(Some(filmcraft_engine::trim::RIPPLE_TRIM_ORIGIN)), Tool::Ripple.icon(), "a ripple trim");
+        assert_eq!(history_icon(Some("timeline.trim")), Tool::Selection.icon(), "a regular trim");
+        assert_eq!(history_icon(Some("trim.next")), Tool::Selection.icon(), "a regular trim to the playhead");
+        assert_eq!(history_icon(Some("timeline.roll")), Tool::Rolling.icon());
         assert_eq!(history_icon(Some("effects.setParam")), Icon::Fx);
         assert_eq!(history_icon(Some("edit.label.rose")), Icon::Square, "a command without an icon gets the square");
         assert_eq!(history_icon(Some("someday.newCommand")), Icon::Square);
         assert_eq!(history_icon(None), Icon::Square, "an edit outside a command gets the square");
     }
 
-    /// Every command id in the History icon lists names a real command, and every prefix starts
-    /// at least one, so a renamed command does not lose its icon unnoticed.
+    /// Every command id in the History icon lists names a real command (or a ripple trim's
+    /// step id), and every prefix starts at least one, so a renamed command does not lose its
+    /// icon unnoticed.
     #[test]
     fn history_icon_lists_name_real_commands() {
         let specs = filmcraft_engine::commands::command_specs();
         let ids = HISTORY_TOOL_COMMANDS.iter().flat_map(|(ids, _)| ids.iter()).chain(HISTORY_COMMANDS.iter().flat_map(|(ids, _)| ids.iter()));
-        for id in ids {
+        for id in ids.filter(|id| **id != filmcraft_engine::trim::RIPPLE_TRIM_ORIGIN) {
             assert!(filmcraft_engine::commands::find(id).is_some(), "{id} is not a command");
         }
         for (prefix, _) in HISTORY_COMMAND_PREFIXES {

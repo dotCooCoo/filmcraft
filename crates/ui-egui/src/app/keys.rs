@@ -144,6 +144,9 @@ impl FilmcraftApp {
             if self.ui.focused == PanelKind::Project && id == "edit.deselectAll" {
                 id = "project.deselectAll".into();
             }
+            // The keys of an In/Out render or delete command and of its work-area command run the
+            // one of the two that the Sequence menu shows.
+            id = menus::shown_render_command(&self.session, &id).to_string();
             // Clear in the Project panel removes the selected bin when no item is selected (#587).
             let clear = if self.ui.focused == PanelKind::Project && id == "project.delete" {
                 self.ui.project_panel.rename = None;

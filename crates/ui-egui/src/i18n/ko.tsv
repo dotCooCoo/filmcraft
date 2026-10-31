@@ -845,6 +845,7 @@
 	Delete Preset	사전 설정 삭제
 	Delete Render Files	렌더 파일 삭제
 	Delete Render Files In to Out	시작~끝 렌더 파일 삭제
+	Delete Work Area Render Files	작업 영역 렌더 파일 삭제
 	Delete Search Bin	검색 빈 삭제
 	Delete selected captions	선택한 자막 삭제
 	Delete this preset	이 사전 설정 삭제
@@ -2520,6 +2521,8 @@
 	Render audio when rendering video	비디오 렌더 시 오디오도 렌더
 	Render Edit in Audition files to:	Audition에서 편집 파일 렌더 위치:
 	Render Effects In to Out	시작~끝 효과 렌더
+	Render Effects in Work Area	작업 영역의 효과 렌더
+	Render Entire Work Area	전체 작업 영역 렌더
 	Render In to Out	시작~끝 렌더
 	Render Selection	선택 영역 렌더
 	Rendered preview	렌더된 미리 보기
@@ -3610,3 +3613,6 @@
 	The control server is disabled: FILMCRAFT_CONTROL_TOKEN must contain 64 random hex characters (see docs/control-protocol.md)	제어 서버가 비활성화되었습니다: FILMCRAFT_CONTROL_TOKEN에는 64자리 무작위 16진수 문자가 필요합니다(docs/control-protocol.md 참조)
 
 # Control server: the bind-failure notice (port collisions; #3318 may show it too).
+
+# Sequence: the Delete Work Area Render Files confirmation.
+	Delete preview files that overlap the work area?	작업 영역과 겹치는 미리 보기 파일을 삭제할까요?

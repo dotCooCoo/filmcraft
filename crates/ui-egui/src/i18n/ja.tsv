@@ -100,6 +100,7 @@
 	Darkest	最も暗い
 	Delete Render Files	レンダリングファイルを削除
 	Delete Render Files In to Out	イン点からアウト点までのレンダリングファイルを削除
+	Delete Work Area Render Files	ワークエリアのレンダリングファイルを削除
 	Delete Tracks…	トラックを削除…
 	Delete Transcript	文字起こしを削除
 	Demo Footage	デモ素材
@@ -273,6 +274,8 @@
 	Rename…	名前を変更…
 	Render Audio	オーディオをレンダリング
 	Render Effects In to Out	イン点からアウト点までのエフェクトをレンダリング
+	Render Effects in Work Area	ワークエリアのエフェクトをレンダリング
+	Render Entire Work Area	ワークエリア全体をレンダリング
 	Render In to Out	イン点からアウト点までをレンダリング
 	Render Selection	選択範囲をレンダリング
 	Replace Fonts in Projects…	プロジェクト内のフォントを置換…
@@ -3633,3 +3636,6 @@
 	The control server is disabled: FILMCRAFT_CONTROL_TOKEN must contain 64 random hex characters (see docs/control-protocol.md)	コントロールサーバーが無効です: FILMCRAFT_CONTROL_TOKEN には 64 文字のランダムな 16 進数文字が必要です (docs/control-protocol.md を参照)
 
 # Control server: the bind-failure notice (port collisions; #3318 may show it too).
+
+# Sequence: the Delete Work Area Render Files confirmation.
+	Delete preview files that overlap the work area?	ワークエリアと重なるプレビューファイルを削除しますか？

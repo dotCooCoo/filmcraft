@@ -91,6 +91,7 @@
 	Darkest	Самый темный
 	Delete Render Files	Удалить файлы рендеринга
 	Delete Render Files In to Out	Удалить файлы рендеринга между точками входа и выхода
+	Delete Work Area Render Files	Удалить файлы рендеринга рабочей области
 	Delete Tracks…	Удалить дорожки…
 	Delete Transcript	Удалить расшифровку
 	Demo Footage	Демонстрационные материалы
@@ -259,6 +260,8 @@
 	Rename…	Переименовать…
 	Render Audio	Рендеринг аудио
 	Render Effects In to Out	Рендеринг эффектов от точки входа до точки выхода
+	Render Effects in Work Area	Рендеринг эффектов в рабочей области
+	Render Entire Work Area	Рендеринг всей рабочей области
 	Render In to Out	Рендеринг от точки входа до точки выхода
 	Render Selection	Рендеринг выделения
 	Replace Fonts in Projects…	Заменить шрифты в проектах…
@@ -361,3 +364,5 @@
 	Next Appearance Mode	Следующий режим оформления
 	Project Notes	Заметки проекта
 
+# Sequence: the Delete Work Area Render Files confirmation.
+	Delete preview files that overlap the work area?	Удалить файлы предпросмотра, пересекающие рабочую область?

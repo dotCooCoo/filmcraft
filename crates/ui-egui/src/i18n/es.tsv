@@ -98,6 +98,7 @@
 	Darkest	Más oscuro
 	Delete Render Files	Eliminar archivos de procesamiento
 	Delete Render Files In to Out	Eliminar archivos de procesamiento de entrada a salida
+	Delete Work Area Render Files	Eliminar archivos de procesamiento del área de trabajo
 	Delete Tracks…	Eliminar pistas…
 	Delete Transcript	Eliminar transcripción
 	Demo Footage	Material de demostración
@@ -272,6 +273,8 @@
 	Rename…	Cambiar nombre…
 	Render Audio	Procesar audio
 	Render Effects In to Out	Procesar efectos de entrada a salida
+	Render Effects in Work Area	Procesar efectos en el área de trabajo
+	Render Entire Work Area	Procesar toda el área de trabajo
 	Render In to Out	Procesar de entrada a salida
 	Render Selection	Procesar selección
 	Replace Fonts in Projects…	Reemplazar fuentes en proyectos…
@@ -3634,3 +3637,6 @@
 	The control server is disabled: FILMCRAFT_CONTROL_TOKEN must contain 64 random hex characters (see docs/control-protocol.md)	El servidor de control está desactivado: FILMCRAFT_CONTROL_TOKEN debe contener 64 caracteres hexadecimales aleatorios (ver docs/control-protocol.md)
 
 # Control server: the bind-failure notice (port collisions; #3318 may show it too).
+
+# Sequence: the Delete Work Area Render Files confirmation.
+	Delete preview files that overlap the work area?	¿Eliminar los archivos de vista previa que se superponen al área de trabajo?

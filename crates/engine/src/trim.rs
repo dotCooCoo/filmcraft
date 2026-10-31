@@ -601,7 +601,8 @@ pub fn commit(s: &mut Session) -> Value {
         Some(TrimKind::Ripple) => "Dynamic Ripple Trim",
         _ => "Dynamic Trim",
     };
-    s.history.undo.push((label.to_string(), d.before));
+    // the step comes from dynamic trimming, whichever command commits it
+    s.history.undo.push((label.to_string(), d.before, Some("trim.shuttle".to_string())));
     if s.history.undo.len() > s.history.limit {
         s.history.undo.remove(0);
     }

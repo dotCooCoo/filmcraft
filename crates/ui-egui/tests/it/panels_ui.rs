@@ -252,6 +252,32 @@ fn history_panel_menu_deletes_redoable_actions_and_clears_the_history() {
     assert!(!d.app().session.is_enabled("history.clear"), "an empty history has nothing to clear");
 }
 
+/// Each History row shows the icon of the command that made its step, oldest first, and an undone
+/// step keeps its icon. The Open row has none. Clicking a row still moves the project to it.
+#[test]
+fn history_rows_show_the_command_icon() {
+    let mut d = Driver::demo();
+    let n0 = d.app().session.history.undo.len();
+    d.exec("file.newBin", json!({"name": "A"}));
+    d.exec("markers.add", json!({}));
+    d.exec("edit.undo", json!({}));
+    d.ok("ui.menu.invoke", json!({"id": "window.panel.History"}));
+    d.frames(3);
+    let (bin, marker) = (format!("history.row.{}", n0 + 1), format!("history.row.{}", n0 + 2));
+    assert_eq!(d.label("history.row.0"), "Open");
+    assert!(!d.has("history.row.0.icon"), "the starting state is not an action");
+    assert_eq!(d.label(&format!("{bin}.icon")), "Folder");
+    assert_eq!(d.label(&format!("{marker}.icon")), "Marker", "an undone step keeps its icon");
+    assert!(!d.has(&format!("history.row.{}", n0 + 3)));
+
+    d.click(&marker);
+    assert_eq!(d.app().session.history.redo.len(), 0, "clicking the undone row redoes it");
+    assert_eq!(d.label(&format!("{marker}.icon")), "Marker");
+    d.click(&bin);
+    assert_eq!(d.app().session.history.redo.len(), 1);
+    assert_eq!(d.label(&format!("{marker}.icon")), "Marker", "the icon stays with its row through undo");
+}
+
 /// The wheel over a tab strip switches that group's tab: down = next, up = previous, one tab per
 /// notch, smaller trackpad steps adding up to a notch, stopping at the ends. Over the panel's
 /// content the wheel leaves the tabs alone.

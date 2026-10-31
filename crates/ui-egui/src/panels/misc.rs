@@ -23,8 +23,10 @@ const HISTORY_TOOL_COMMANDS: &[(&[&str], Tool)] = &[
     (&["graphics.newShape", "graphics.newPolygon"], Tool::Pen),
 ];
 
-/// History icons for other undoable commands with an icon of their own.
+/// History icons for other undoable commands with an icon of their own, and the plain square for
+/// a command that a family below would otherwise give the wrong icon.
 const HISTORY_COMMANDS: &[(&[&str], Icon)] = &[
+    (&["trim.applyDefaultTransition"], Icon::Square),
     (&["source.insert", "edit.pasteInsert"], Icon::Insert),
     (&["source.overwrite", "edit.paste"], Icon::Overwrite),
     (&["sequence.lift", "transcript.lift"], Icon::Lift),
@@ -553,6 +555,11 @@ mod tests {
         assert_eq!(history_icon(Some("timeline.trim")), Tool::Selection.icon(), "a regular trim");
         assert_eq!(history_icon(Some("trim.next")), Tool::Selection.icon(), "a regular trim to the playhead");
         assert_eq!(history_icon(Some("timeline.roll")), Tool::Rolling.icon());
+        assert_eq!(
+            history_icon(Some("trim.applyDefaultTransition")),
+            history_icon(Some("sequence.applyDefaultTransitionsToSelection")),
+            "adding transitions at edit points is not a rolling edit"
+        );
         assert_eq!(history_icon(Some("effects.setParam")), Icon::Fx);
         assert_eq!(history_icon(Some("edit.label.rose")), Icon::Square, "a command without an icon gets the square");
         assert_eq!(history_icon(Some("someday.newCommand")), Icon::Square);
